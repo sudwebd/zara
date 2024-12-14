@@ -1,0 +1,16 @@
+[
+    {
+        "category": "jackets",
+        "subcategory": "puffers",
+        "name": "SHORT FLARED DRESS",
+        "price": "4,350.00",
+        "image_urls": "https://static.zara.net/assets/public/524f/06fc/61324c80a9e0/74a79c470554/03067210800-p/03067210800-p.jpg?ts=1733851345445&w=2048,https://static.zara.net/assets/public/ea11/d5c4/f7814868bbdf/aad50063e9f1/03067210800-a1/03067210800-a1.jpg?ts=1733851344479&w=2048,https://static.zara.net/assets/public/efdd/4509/33464a2185b1/c051361dcb81/03067210800-a2/03067210800-a2.jpg?ts=1733851346139&w=2048,https://static.zara.net/assets/public/15b5/925f/b1c34d1d9df3/6509e5149fdf/03067210800-a3/03067210800-a3.jpg?ts=1733851343909&w=2048,https://static.zara.net/assets/public/e011/f1a7/57df422c9085/d340c853ff72/03067210800-a4/03067210800-a4.jpg?ts=1733851346100&w=2048,https://static.zara.net/assets/public/6da1/e3f6/a85748d2853d/aa5c6fc52bf6/03067230800-e1/03067230800-e1.jpg?ts=1726827218329&w=2048,https://static.zara.net/assets/public/b6f2/1db9/95d641a09423/a51fb00dd0fb/03067230800-e2/03067230800-e2.jpg?ts=1726827216600&w=2048,https://static.zara.net/assets/public/7562/3514/0f444a628ad3/77eab931cdce/03067230800-e3/03067230800-e3.jpg?ts=1726827221959&w=2048,https://static.zara.net/assets/public/dc71/fceb/d2204b0ab74f/7da62500bb7e/03067230800-e4/03067230800-e4.jpg?ts=1726827220169&w=2048,",
+        "product_link": "https://www.zara.com/in/en/short-flared-dress-p03067210.html?v1=424968217",
+        "sku_id": "03067210",
+        "sizes": "XS,S,M,L,",
+        "gender": "woman",
+        "original_price": "4,350.00",
+        "color": "Black ",
+        "color_code": "800"
+    }
+]

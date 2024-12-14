@@ -155,5 +155,5 @@ def process_shopify_csv(json_file, csv_file):
 # Main Execution
 if __name__ == "__main__":
     json_file = "ManAll.json"  # Replace with the actual JSON file path
-    csv_file = "zara_Man_New.csv"  # Replace with the desired CSV output path
+    csv_file = "zara_Man.csv"  # Replace with the desired CSV output path
     process_shopify_csv(json_file, csv_file)
