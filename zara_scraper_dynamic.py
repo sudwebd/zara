@@ -123,11 +123,11 @@ def fetch_html_with_debugging(url):
             response_text = raw_content.decode("latin-1", errors="replace")
             print("[DEBUG] Decoded using 'latin-1' with errors replaced.")
         
-        # Save raw and decoded content for debugging
-        with open("debug_raw_output.bin", "wb") as f:
-            f.write(response.content)
-        with open("debug_decoded_output.html", "w", encoding="utf-8") as f:
-            f.write(response_text)
+        # # Save raw and decoded content for debugging
+        # with open("debug_raw_output.bin", "wb") as f:
+        #     f.write(response.content)
+        # with open("debug_decoded_output.html", "w", encoding="utf-8") as f:
+        #     f.write(response_text)
         
         # Parse with BeautifulSoup
         soup = BeautifulSoup(response_text, "html.parser")

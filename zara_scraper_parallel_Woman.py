@@ -278,7 +278,7 @@ def process_category(url, scroll):
 
 if __name__ == "__main__":
     file_path = "categories.csv"  # Replace with the actual path to your CSV file
-    gender = "Man"
+    gender = "Woman"
 
     with open(file_path, mode="r", encoding="utf-8") as file:
         reader = csv.DictReader(file)

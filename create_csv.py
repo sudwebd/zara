@@ -31,11 +31,12 @@ def clean_price(price):
     match = re.sub(r"[^\d.]", "", price)
     return match or "0"
 
+product_img_idx = {}
 def format_shopify_csv(product):
     """
     Format a single product dictionary into Shopify-compatible CSV rows.
     """
-    global unique_product_variants
+    global unique_product_variants, product_img_idx
     rows = []
     product_id = extract_product_id(product.get("product_link", ""))
     image_urls = product.get("image_urls", "").split(",")  # Split image URLs
@@ -62,6 +63,10 @@ def format_shopify_csv(product):
     tags = f"{gender}, {category}, {sub_category}"
     if price != original_price:
         tags += ", Sale"
+
+    # Initialize or reset image position tracker for this product
+    if product_id not in product_img_idx:
+        product_img_idx[product_id] = 1        
 
     # Format rows for Shopify
     for idx, size in enumerate(sizes):
@@ -93,7 +98,7 @@ def format_shopify_csv(product):
             "Variant Taxable": "",
             "Variant Barcode": "",
             "Image Src": image_urls[idx] if idx < len(image_urls) else "",
-            "Image Position": idx + 1 if idx < len(image_urls) else "",
+            "Image Position": product_img_idx[product_id] if idx < len(image_urls) else "",
             "Image Alt Text": "",
             "Gift Card": "",
             "SEO Title": "",
@@ -119,6 +124,7 @@ def format_shopify_csv(product):
             "Compare At Price / International": "",
             "Status": "active" if idx == 0 else "",
         }
+        if idx < len(image_urls): product_img_idx[product_id] += 1
         rows.append(base_row)
 
     # Add extra rows for remaining images without size information
@@ -127,8 +133,9 @@ def format_shopify_csv(product):
             "Handle": product_id,
             "Command": "REPLACE",
             "Image Src": image_urls[img_idx],
-            "Image Position": img_idx + 1,
+            "Image Position": product_img_idx[product_id],
         }
+        product_img_idx[product_id] += 1
         rows.append(extra_row)
 
     return rows
@@ -154,6 +161,6 @@ def process_shopify_csv(json_file, csv_file):
 
 # Main Execution
 if __name__ == "__main__":
-    json_file = "ManAll.json"  # Replace with the actual JSON file path
-    csv_file = "zara_Man_New.csv"  # Replace with the desired CSV output path
+    json_file = "WomanAll_New_Final.json"  # Replace with the actual JSON file path
+    csv_file = "zara_Woman_Updated.csv"  # Replace with the desired CSV output path
     process_shopify_csv(json_file, csv_file)
