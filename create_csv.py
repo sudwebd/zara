@@ -32,11 +32,13 @@ def clean_price(price):
     return match or "0"
 
 product_img_idx = {}
-def format_shopify_csv(product):
+
+sku_id_to_cc = {}
+def format_shopify_csv(product, create_master_csv):
     """
     Format a single product dictionary into Shopify-compatible CSV rows.
     """
-    global unique_product_variants, product_img_idx
+    global unique_product_variants, product_img_idx, sku_id_to_cc
     rows = []
     product_id = extract_product_id(product.get("product_link", ""))
     image_urls = product.get("image_urls", "").split(",")  # Split image URLs
@@ -53,6 +55,12 @@ def format_shopify_csv(product):
         print(f"[INFO] Skipping duplicate variant: {variant_key}")
         return rows
     unique_product_variants.add(variant_key)
+    if create_master_csv:
+        if product_id not in sku_id_to_cc:
+            sku_id_to_cc[product_id] = []
+        sku_id_to_cc[product_id].append((color_code + "#" + product.get("color_code") + "#" + product.get("sizes", "")[:-1], product.get("gender", "")))
+
+        return rows
 
     title = product.get("name", "")
     category = product.get("category", "")
@@ -140,7 +148,7 @@ def format_shopify_csv(product):
 
     return rows
 
-def process_shopify_csv(json_file, csv_file):
+def process_shopify_csv(json_file, csv_file, create_master_csv):
     """
     Process a single JSON file and convert it to Shopify-compatible CSV.
     """
@@ -150,8 +158,20 @@ def process_shopify_csv(json_file, csv_file):
 
         all_rows = []
         for product in data:
-            all_rows.extend(format_shopify_csv(product))
-
+            all_rows.extend(format_shopify_csv(product, create_master_csv))
+        if create_master_csv:
+            all_rows = []
+            for sku_id, col_sz_list in sku_id_to_cc.items():
+                cols_sz = ""
+                for i, (col_sz, gender) in enumerate(col_sz_list):
+                    cols_sz += col_sz
+                    if(i < len(col_sz_list) - 1): cols_sz += "|"
+                base_row = {
+                    "sku_base": sku_id,
+                    "cols_sz": cols_sz, 
+                    "gender": gender
+                }
+                all_rows.append(base_row)
         # Convert to DataFrame and save as CSV
         df = pd.DataFrame(all_rows)
         df.to_csv(csv_file, index=False, encoding="utf-8")
@@ -161,6 +181,7 @@ def process_shopify_csv(json_file, csv_file):
 
 # Main Execution
 if __name__ == "__main__":
-    json_file = "WomanAll_New_Final.json"  # Replace with the actual JSON file path
-    csv_file = "zara_Woman_Updated.csv"  # Replace with the desired CSV output path
-    process_shopify_csv(json_file, csv_file)
+    json_file = "scrapes/master.json"  # Replace with the actual JSON file path
+    csv_file = "master_file.csv"  # Replace with the desired CSV output path
+    create_master_csv = False
+    process_shopify_csv(json_file, csv_file, create_master_csv)

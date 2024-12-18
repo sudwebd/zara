@@ -14,7 +14,12 @@ import time
 from concurrent.futures import ThreadPoolExecutor
 from threading import Lock
 import logging
-logging.basicConfig(level=logging.INFO)
+logging.basicConfig(filename=f"logs/new_products_{time.time()}.log",
+                    filemode='a',
+                    format='%(asctime)s,%(msecs)d %(name)s %(levelname)s %(message)s',
+                    datefmt='%H:%M:%S',
+                    level=logging.DEBUG)
+logging.getLogger().addHandler(logging.StreamHandler(sys.stdout))
 # Shared data and locks
 json_data = []
 processed_products = []
@@ -26,11 +31,11 @@ api_lock = Lock()
 session = requests.Session()
 
 def exit_handler():
-    output_file = os.path.join(gender + "All.json")
+    output_file = os.path.join("All.json")
     with data_lock:
         with open(output_file, "w", encoding="utf-8") as f:
             json.dump(json_data, f, indent=4)
-        logging.info(f"Saved {len(json_data)} products for gender {gender}")
+        logging.info(f"Saved {len(json_data)} products")
 
 atexit.register(exit_handler)
 
@@ -86,12 +91,14 @@ def fetch_html_with_debugging(url):
         return None
 
 size_map = {
-    'XXL': '08',
     'XS': '01',
     'S': '02',
     'M': '03',
     'L': '04', 
     'XL': '05',
+    'XXL': '06',
+    'XXXL': '07',
+    'XXS': '08',
 }
 
 def extract_size(value):
@@ -245,6 +252,7 @@ def process_product(url):
         # If no store data, you might want to log this or handle it differently
         logging.info(f"No store data found for product: {url}")
 
+master_skus = []
 def process_category(url, scroll):
     driver = open_category(url, scroll)
     if not driver:
@@ -261,7 +269,12 @@ def process_category(url, scroll):
                 v1 = product.get_attribute("data-productid")
                 product_url_element = product.find_element(By.CSS_SELECTOR, "div.product-grid-product__figure a")
                 
-                sku_id = re.search(r'p(\d+)\.html', product_url_element.get_attribute("href")).group(1)   
+                sku_id = re.search(r'p(\d+)\.html', product_url_element.get_attribute("href")).group(1)  
+                if sku_id in master_skus: 
+                    logging.info(f"sku_id {sku_id} already on Shopin, skipping")
+                    continue
+                else:
+                    logging.info(f"sku_id {sku_id} new product added to Zara")
                 product_url = product_url_element.get_attribute("href") +  "?v1=" + v1 + "&v2=" + v2
                 product_urls.append(product_url)
             except Exception as e:
@@ -275,15 +288,24 @@ def process_category(url, scroll):
 
     finally:
         driver.quit()
+def fetch_master_skus(csv_master_file):
+    global master_skus
+    with open(csv_master_file, "r", encoding="utf-8") as infile:
+        reader = csv.DictReader(infile, delimiter=",")    
+        for row in reader:    
+           master_skus.append(row["sku_base"]) 
+    
 
 if __name__ == "__main__":
-    file_path = "categories.csv"  # Replace with the actual path to your CSV file
-    gender = "Man"
-
+    file_path = "csv/categories.csv"  # Replace with the actual path to your CSV file
+    fetch_new = True
+    if fetch_new:
+        fetch_master_skus("master_file.csv")
     with open(file_path, mode="r", encoding="utf-8") as file:
         reader = csv.DictReader(file)
         for row in reader:
             category = row.get("Category", "").strip()
             sub_category = row.get("Sub Category", "").strip()
             link = row.get("Link", "").strip()
+            gender = row.get("Gender", "").strip()
             process_category(link, scroll=1)
