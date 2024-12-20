@@ -14,6 +14,7 @@ import time
 from concurrent.futures import ThreadPoolExecutor
 from threading import Lock
 import logging
+import pandas as pd
 logging.basicConfig(filename=f"logs/new_products_{time.time()}.log",
                     filemode='a',
                     format='%(asctime)s,%(msecs)d %(name)s %(levelname)s %(message)s',
@@ -295,13 +296,27 @@ def fetch_master_skus(csv_master_file):
         reader = csv.DictReader(infile, delimiter=",")    
         for row in reader:    
            master_skus.append(row["sku_base"]) 
+
+def get_unique_handles_fast(csv_file):
+    global master_skus
+    """
+    Very fast function to get unique handles from CSV file using pandas.
     
+    Args:
+        csv_file: Path to the combined CSV file
+        
+    Returns:
+        list: List of unique handles
+    """
+    # Read only the Handle column
+    handles = pd.read_csv(csv_file, usecols=['Handle'])['Handle'].unique()
+    master_skus = handles.tolist()    
 
 if __name__ == "__main__":
-    file_path = "csv/categories.csv"  # Replace with the actual path to your CSV file
+    file_path = "csv/categories_test.csv"  # Replace with the actual path to your CSV file
     fetch_new = True
     if fetch_new:
-        fetch_master_skus("master_file.csv")
+        get_unique_handles_fast("master_merge.csv")
     with open(file_path, mode="r", encoding="utf-8") as file:
         reader = csv.DictReader(file)
         for row in reader:
