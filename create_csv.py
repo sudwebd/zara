@@ -2,6 +2,7 @@ import os
 import json
 import pandas as pd
 import re
+import orjson
 
 # Set to track unique product_id + color_code combinations
 unique_product_variants = set()
@@ -34,6 +35,26 @@ def clean_price(price):
 product_img_idx = {}
 
 sku_id_to_cc = {}
+
+# def master_csv_maker(product):
+#     if create_master_csv:
+#         if product_id not in sku_id_to_cc:
+#             sku_id_to_cc[product_id] = []
+#         sku_id_to_cc[product_id].append((color_code + "#" + product.get("color_code") + "#" + product.get("sizes", "")[:-1], product.get("gender", "")))
+#     all_rows = []
+#     for sku_id, col_sz_list in sku_id_to_cc.items():
+#         cols_sz = ""
+#         for i, (col_sz, gender) in enumerate(col_sz_list):
+#             cols_sz += col_sz
+#             if(i < len(col_sz_list) - 1): cols_sz += "|"
+#         base_row = {
+#             "sku_base": sku_id,
+#             "cols_sz": cols_sz, 
+#             "gender": gender
+#         }
+#         all_rows.append(base_row)
+#     return all_rows
+
 def format_shopify_csv(product, create_master_csv):
     """
     Format a single product dictionary into Shopify-compatible CSV rows.
@@ -43,8 +64,13 @@ def format_shopify_csv(product, create_master_csv):
     product_id = extract_product_id(product.get("product_link", ""))
     image_urls = product.get("image_urls", "").split(",")  # Split image URLs
     del image_urls[-1]
-    sizes = product.get("sizes", "").split(",")  # Split sizes
-    del sizes[-1]
+    sz_dt = product.get("sizes", "")
+    sizes = []
+    if "," in sz_dt:
+        sizes = sz_dt.split(",")  # Split sizes
+        del sizes[-1]
+    else:
+        sizes = [sz_dt]
     color_code = product.get("color", "")
     if not product_id or not color_code:
         return rows  # Skip products without valid product IDs or color codes
@@ -55,12 +81,6 @@ def format_shopify_csv(product, create_master_csv):
         print(f"[INFO] Skipping duplicate variant: {variant_key}")
         return rows
     unique_product_variants.add(variant_key)
-    if create_master_csv:
-        if product_id not in sku_id_to_cc:
-            sku_id_to_cc[product_id] = []
-        sku_id_to_cc[product_id].append((color_code + "#" + product.get("color_code") + "#" + product.get("sizes", "")[:-1], product.get("gender", "")))
-
-        return rows
 
     title = product.get("name", "")
     category = product.get("category", "")
@@ -148,7 +168,7 @@ def format_shopify_csv(product, create_master_csv):
 
     return rows
 
-def process_shopify_csv(json_file, csv_file, create_master_csv):
+def process_shopify_csv(json_file, csv_file):
     """
     Process a single JSON file and convert it to Shopify-compatible CSV.
     """
@@ -158,20 +178,7 @@ def process_shopify_csv(json_file, csv_file, create_master_csv):
 
         all_rows = []
         for product in data:
-            all_rows.extend(format_shopify_csv(product, create_master_csv))
-        if create_master_csv:
-            all_rows = []
-            for sku_id, col_sz_list in sku_id_to_cc.items():
-                cols_sz = ""
-                for i, (col_sz, gender) in enumerate(col_sz_list):
-                    cols_sz += col_sz
-                    if(i < len(col_sz_list) - 1): cols_sz += "|"
-                base_row = {
-                    "sku_base": sku_id,
-                    "cols_sz": cols_sz, 
-                    "gender": gender
-                }
-                all_rows.append(base_row)
+            all_rows.extend(format_shopify_csv(product))
         # Convert to DataFrame and save as CSV
         df = pd.DataFrame(all_rows)
         df.to_csv(csv_file, index=False, encoding="utf-8")
@@ -179,9 +186,104 @@ def process_shopify_csv(json_file, csv_file, create_master_csv):
     except Exception as e:
         print(f"Error processing {json_file}: {e}")
 
+import orjson
+
+def merge_json_files_fast(file1, file2, output_file):
+    # Read and parse the first JSON file
+    with open(file1, "rb") as f1:  # Read in binary mode for orjson
+        data1 = orjson.loads(f1.read())  # Parse JSON
+    
+    # Read and parse the second JSON file
+    with open(file2, "rb") as f2:
+        data2 = orjson.loads(f2.read())
+    
+    # Merge the two lists
+    merged_data = data1 + data2
+    
+    # Write the merged data to the output file
+    with open(output_file, "wb") as fout:
+        fout.write(orjson.dumps(merged_data, option=orjson.OPT_INDENT_2))  # Write JSON
+
+# Example usage
+
+def process_product_data(shopify_file, inventory_file, json_file, output_file):
+    # Read Shopify product file
+    df_shopify = pd.read_csv(shopify_file)
+    
+    # Filter out image rows (keeping only variant rows)
+    df_variants = df_shopify[df_shopify['Option1 Value'].notna()].copy()
+    
+    # Read inventory file
+    df_inventory = pd.read_csv(inventory_file)
+    
+    # Read JSON file
+    with open(json_file, 'r') as f:
+        json_data = json.load(f)
+    df_json = pd.json_normalize(json_data)
+    
+    # Ensure Handle is string type in both dataframes
+    df_variants['Handle'] = df_variants['Handle'].astype(str)
+    df_inventory['Handle'] = df_inventory['Handle'].astype(str)
+    
+    # Create matching keys for inventory
+    df_variants['match_key'] = df_variants['Handle'] + '_' + \
+                              df_variants['Option1 Value'].astype(str) + '_' + \
+                              df_variants['Option2 Value'].astype(str)
+    
+    df_inventory['match_key'] = df_inventory['Handle'] + '_' + \
+                               df_inventory['Option1 Value'].astype(str) + '_' + \
+                               df_inventory['Option2 Value'].astype(str)
+    
+    # Match variants with inventory data
+    df_merged = df_variants.merge(
+        df_inventory[['ID', 'Variant ID', 'match_key']],
+        on='match_key',
+        how='left'
+    )
+    
+    # Prepare JSON data for matching (handle and color)
+    # Remove leading zeros from sku_id to match Handle format
+    df_json['sku_id_cleaned'] = df_json['sku_id'].str.lstrip('0')
+    df_json['json_match_key'] = df_json['sku_id_cleaned'] + '_' + df_json['color']
+    
+    # Create corresponding match key in merged data
+    df_merged['json_match_key'] = df_merged['Handle'] + '_' + df_merged['Option1 Value'].astype(str)
+    
+    # Match with JSON data
+    df_final = df_merged.merge(
+        df_json[['json_match_key', 'product_link', 'color_code']],
+        on='json_match_key',
+        how='left'
+    )
+    
+    # Select and rename final columns
+    columns_to_keep = [
+        'Handle', 'Title', 'ID', 'Variant ID', 
+        'Option1 Name', 'Option1 Value',  # Color
+        'Option2 Name', 'Option2 Value',  # Size
+        'Variant Price', 'Variant Compare At Price',
+        'Variant Inventory Qty', 'Variant Image',
+        'product_link', 'color_code'
+    ]
+    
+    df_final = df_final[columns_to_keep]
+    
+    df_final.to_csv(output_file, index=False)
+
 # Main Execution
 if __name__ == "__main__":
-    json_file = "scrapes/master.json"  # Replace with the actual JSON file path
-    csv_file = "master_file.csv"  # Replace with the desired CSV output path
-    create_master_csv = False
-    process_shopify_csv(json_file, csv_file, create_master_csv)
+    # meant for new product csv creation
+    json_file = "All.json"  # Replace with the actual JSON file path
+    csv_file = "new_products.csv"  # Replace with the desired CSV output path
+    # meant for master csv creation
+    create_master_csv = True
+    if create_master_csv:
+        variant_csv = "latest_masters/master_inventory_19-12-2024.csv"
+        last_upload_csv = "latest_masters/master_upload_19-12-2024.csv"
+        new_products = "latest_masters/new_products_19122024.csv"
+        full_new_json = "full_new.json"
+        merge_json_files_fast("latest_masters/All.json", "latest_masters/new_19122024.json", full_new_json)
+        process_product_data(last_upload_csv, variant_csv, full_new_json, "master_merge.csv")
+        print("Data processing complete. Check combined_product_data.csv")
+    else:
+        process_shopify_csv(json_file, csv_file)

@@ -31,7 +31,8 @@ api_lock = Lock()
 session = requests.Session()
 
 def exit_handler():
-    output_file = os.path.join("All.json")
+    suf = "_new" if fetch_new else ""
+    output_file = os.path.join(f"All{suf}.json")
     with data_lock:
         with open(output_file, "w", encoding="utf-8") as f:
             json.dump(json_data, f, indent=4)

@@ -6,12 +6,20 @@ import time
 import logging
 import sys, os
 from imports_common import *
+import requests
+import brotli
+from bs4 import BeautifulSoup
 logging.basicConfig(filename=f"logs/inventory_fetch{time.time()}.log",
                     filemode='a',
                     format='%(asctime)s,%(msecs)d %(name)s %(levelname)s %(message)s',
                     datefmt='%H:%M:%S',
                     level=logging.DEBUG)
 logging.getLogger().addHandler(logging.StreamHandler(sys.stdout))
+# session_lock = Lock()
+# api_lock = Lock()
+
+# Shared session
+# session = requests.Session()
 #size guide:
     # 'XS': '01',
     # 'S': '02',
@@ -98,6 +106,7 @@ def match_sizes_with_original(csv_master_file, upload_master_file, output_file):
                 col_orig = info[0]
                 col_code_orig = info[1]
                 size_orig = info[2].split(",")
+                # size_pdp = info[3]
                 # color_size_removed[sku_base] = {}
                 # color_size_removed[sku_base][col_orig] = 
                 logging.debug(f"map {color_to_size_new}")
@@ -176,6 +185,49 @@ def search_and_append(csv_file, output_file, search_criteria):
     else:
         logging.debug("No matching row found.")
 
+HEADERS = {
+    "accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8",
+    "accept-encoding": "gzip, deflate",
+    "accept-language": "en-US,en;q=0.9",
+    "cache-control": "no-cache",
+    "user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.5735.199 Safari/537.36",
+}
+
+def fetch_html_with_debugging(url):
+    global session
+    try:
+        # with session_lock:
+        logging.info(f"[DEBUG] Starting fetch for URL: {url}")
+        response = session.get(url, headers=HEADERS)
+        response.raise_for_status()
+        
+        # Brotli decompression if needed
+        content_encoding = response.headers.get("content-encoding", "")
+        raw_content = response.content
+        if content_encoding == "br":
+            raw_content = brotli.decompress(raw_content)
+        
+        response_text = raw_content.decode("utf-8")
+        return BeautifulSoup(response_text, "html.parser")
+    except Exception as e:
+        logging.info(f"[ERROR] Failed to fetch or parse the page. Exception {e}")
+        return None
+
+def fetch_product_prices(pdp_link):
+    product_soup = fetch_html_with_debugging(pdp_link)
+    if not product_soup:
+        logging.info(f"Failed to create driver for {pdp_link}")
+        return
+    details = product_soup.select_one('div.layout.layout--grid-type-standard.layout-catalog.product-detail-view  div.layout-content.layout-catalog-content--full div.product-detail-view__main') 
+    price_discount_dt = details.select_one('div.product-detail-view__side-bar div.product-detail-info__price span.price__amount.price__amount--on-sale.price__amount--is-highlighted.price-current--with-background.price-current--is-highlighted span.price-current__amount span.money-amount__main')
+    price_discount = re.sub(r"[^\d.,]", "", price_discount_dt.text) if price_discount_dt else "0"
+    if price_discount != "0":
+        price = re.sub(r"[^\d.,]", "", details.select_one('div.product-detail-view__side-bar div.product-detail-info__price span.price__amount--old-price-wrapper span.money-amount__main').text)
+    else:    
+        price = re.sub(r"[^\d.,]", "", details.select_one('div.product-detail-view__side-bar div.product-detail-info__price span.money-amount__main').text)
+        price_discount = price   
+    return (price_discount, price)    
+
 def add_new_sizes_to_csv(input_csv, output_csv):
     """
     Process a CSV file, fetch existing information, and add rows for new sizes.
@@ -202,6 +254,8 @@ def add_new_sizes_to_csv(input_csv, output_csv):
         # Step 2: Process new sizes and create new rows
         for handle, colors in new_sizes.items():
             for color, sizes in colors.items():
+                # (price_discount, price) = fetch_product_prices(pdp_link)
+                # print(price_discount, price)
                 key = (handle, color)
                 if key in lookup:
                     base_row = lookup[key]  # Fetch the base row for this handle and color
@@ -211,6 +265,8 @@ def add_new_sizes_to_csv(input_csv, output_csv):
                         new_row["Option2 Value"] = size  # Update size
                         new_row["Command"] = "MERGE"     # Update command to MERGE
                         new_row["Tags"] = ""
+                        # new_row["Variant Price"] = price_discount,
+                        # new_row["Variant Compare At Price"] = price,                        
                         new_row["Image Src"] = ""
                         new_row["Image Position"] = ""
                         new_row["Variant Inventory Qty"] = 1000  # Clear inventory for new rows
@@ -221,5 +277,9 @@ def add_new_sizes_to_csv(input_csv, output_csv):
         print(f"Processing complete! New rows added and saved to {output_csv}")
 
 if __name__ == "__main__":  
+
+    # new_sizes["05070660"] = {}
+    # new_sizes["05070660"]["Grey marl"] = (["M", "L"], "https://www.zara.com/in/en/soft-button-coat-p05070660.html?v1=423157370&v2=2419020")
+
     match_sizes_with_original("master_file.csv", "last_upload_master.csv", "removal.csv")
     add_new_sizes_to_csv("csv/master_upload.csv", "new_upload.csv")
