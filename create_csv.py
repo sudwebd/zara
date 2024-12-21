@@ -55,7 +55,7 @@ sku_id_to_cc = {}
 #         all_rows.append(base_row)
 #     return all_rows
 
-def format_shopify_csv(product, create_master_csv):
+def format_shopify_csv(product):
     """
     Format a single product dictionary into Shopify-compatible CSV rows.
     """
@@ -251,7 +251,7 @@ def process_product_data(shopify_file, inventory_file, json_file, output_file):
     
     # Match with JSON data
     df_final = df_merged.merge(
-        df_json[['json_match_key', 'product_link', 'color_code']],
+        df_json[['json_match_key', 'product_link', 'color_code', 'gender']],
         on='json_match_key',
         how='left'
     )
@@ -263,7 +263,7 @@ def process_product_data(shopify_file, inventory_file, json_file, output_file):
         'Option2 Name', 'Option2 Value',  # Size
         'Variant Price', 'Variant Compare At Price',
         'Variant Inventory Qty', 'Variant Image',
-        'product_link', 'color_code'
+        'product_link', 'color_code', 'gender'
     ]
     
     df_final = df_final[columns_to_keep]
@@ -273,8 +273,8 @@ def process_product_data(shopify_file, inventory_file, json_file, output_file):
 # Main Execution
 if __name__ == "__main__":
     # meant for new product csv creation
-    json_file = "All.json"  # Replace with the actual JSON file path
-    csv_file = "new_products.csv"  # Replace with the desired CSV output path
+    json_file = "All_new.json"  # Replace with the actual JSON file path
+    csv_file = "new_products_21-12-2024.csv"  # Replace with the desired CSV output path
     # meant for master csv creation
     create_master_csv = True
     if create_master_csv:
