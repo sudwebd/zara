@@ -303,6 +303,6 @@ if __name__ == "__main__":
         categories = list(csv.DictReader(file))
     
     # Process all categories with a single browser instance
-    # process_categories(categories)
+    process_categories(categories)
     
     logging.info("Scraping completed")
